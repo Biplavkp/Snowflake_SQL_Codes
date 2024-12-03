@@ -1,0 +1,278 @@
+CREATE OR REPLACE TABLE sales_data (
+    transaction_id INT PRIMARY KEY,
+    transaction_date DATE,
+    product_category VARCHAR(50),
+    customer_id INT,
+    product_id INT,
+    region VARCHAR(50),
+    sales_amount DECIMAL(10, 2),
+    units_sold INT
+);
+
+CREATE OR REPLACE TABLE sales_data_table_output_mat 
+AS SELECT * FROM sales_data;
+
+CREATE OR REPLACE TABLE sales_kpi_copy LIKE SALES_DATA_KPI;
+
+SE
+
+SELECT * FROM sales_data_table_output_mat;
+
+SELECT * FROM sales_data LIMIT 100;
+SELECT DISTINCT product_category FROM sales_data;--6
+
+SELECT COUNT(DISTINCT customer_id) AS TOT_CUST FROM sales_data;--1000
+
+  
+
+SELECT * FROM sales_data WHERE product_category IS NULL;--50
+SELECT * FROM sales_data WHERE sales_amount IS NULL;--100
+SELECT * FROM sales_data WHERE units_sold IS NULL;--0
+SELECT * FROM sales_data WHERE customer_id IS NULL;--0
+SELECT * FROM sales_data WHERE product_id IS NULL;--0
+SELECT * FROM sales_data WHERE region IS NULL;--75
+SELECT * FROM sales_data WHERE transaction_id IS NULL;--0
+SELECT * FROM sales_data WHERE transaction_date IS NULL;--0
+
+SELECT COUNT(*) FROM sales_data;--10000
+
+
+
+
+
+-- Use Case 1: Sales Performance Analysis by Product Category
+-- Scenario: You have a dataset of sales transactions over the last 4 years, with columns like transaction_id, product_category, transaction_date, sales_amount, and region.
+
+-- Objective: You want to analyze total sales per product category over the last 4 years, focusing on categories with at least $500,000 in sales.
+SELECT --execution no.4
+    product_category,
+    SUM(sales_amount) AS total_sales
+FROM --execution no.1
+    sales_data
+GROUP BY --execution no.2
+    product_category
+---HAVING --execution no.3
+    ---SUM(sales_amount) > 500000
+ORDER BY --execution no.5
+    product_category, total_sales DESC;
+    
+--GROUP BY: Groups the data by product_category to calculate total sales for each category.
+--HAVING: Filters the results to only include categories with total sales above $500,000.
+--ORDER BY: Sorts the categories based on total sales in descending order, so the top-performing categories appear first.
+
+--Use Case 2: Monthly Revenue Trends by Region
+--Scenario: A retail company has monthly sales data over the past 4 years with columns like region, month, year, and revenue.
+
+-- Objective: Analyze the revenue trends by region and identify regions that have consistently performed well.
+CREATE OR REPLACE TABLE sales_data_kpi AS 
+SELECT
+      NVL(region, 'unspecified') as REGION,
+      year(transaction_date) as TXN_YR,
+      quarter(transaction_date) as TXN_QTR,
+      month(transaction_date) as TXN_MNTH,
+      count(distinct customer_id) as TOT_CUST,
+      count(transaction_id) as TOT_TXNS,
+      sum(units_sold) as TOT_UNITS_SOLD,
+      round(sum(sales_amount),0) as TOT_REV,
+      round(avg(sales_amount),0) as TOT_REV,
+      round(sum(units_sold)/count(transaction_id),0) as UPT,
+      round(count(transaction_id)/count(distinct customer_id),0) as TPC,
+FROM
+    sales_data
+GROUP BY
+        region, year(transaction_date), quarter(transaction_date), month(transaction_date)
+ORDER BY
+        region, year(transaction_date),quarter(transaction_date), month(transaction_date);
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CREATE OR REPLACE TABLE sales_data_kpi AS
+SELECT 
+    NVL(region, 'Unspecified') AS region, 
+    year(transaction_date) as TXN_YR, 
+    quarter(transaction_date) AS TXN_QTR,
+    month(transaction_date) AS TXN_MNTH,
+    count(distinct customer_id) as total_customer,
+    count(transaction_id) as total_txns,
+    sum(units_sold) as total_units_sold,
+    round(SUM(sales_amount),0) AS total_rev,
+    round(AVG(sales_amount),0) AS avg_rev,
+    round(sum(units_sold)/count(transaction_id),0) as UPT,
+    round(count(transaction_id)/ count(distinct customer_id),0) as TPC
+     
+FROM sales_data
+GROUP BY region, year(transaction_date),quarter(transaction_date),month(transaction_date)
+having UPT > 1
+ORDER BY region, year(transaction_date),quarter(transaction_date),month(transaction_date);
+    
+--GROUP BY: Aggregates revenue data by region, year, and month to calculate monthly totals for each region.
+--ORDER BY: Orders the result set by region, year, and month to visualize trends over time.
+
+-- Use Case 3: Customer Lifetime Value (CLTV) Calculation
+-- Scenario: You are working with customer transaction data over the last 4 years, with columns like customer_id, transaction_amount, transaction_date, and region.
+
+-- Objective: Calculate the total value of each customer’s transactions over 4 years and filter for customers whose lifetime value is greater than $10,000.
+
+SELECT 
+    customer_id, 
+    SUM(SALES_AMOUNT) AS lifetime_value
+FROM 
+    sales_data
+GROUP BY 
+    customer_id
+HAVING 
+    SUM(SALES_AMOUNT) > 10000
+ORDER BY 
+    lifetime_value DESC;
+    
+--GROUP BY: Groups data by customer_id to calculate total transaction amounts for each customer.
+--HAVING: Filters customers whose lifetime transaction value exceeds $10,000.
+---ORDER BY: Sorts customers by their lifetime value in descending order.
+
+--Use Case 4: Product Inventory Turnover
+--Scenario: You have inventory data with columns like product_id, month, year, units_sold, and units_in_stock.
+--Objective: Identify products that have sold more than 1,000 units in any given month and order them by sales volume.
+
+SELECT 
+    product_id, 
+    year(transaction_date) as TXN_YR, 
+    month(transaction_date) AS TXN_MNTH,  
+    SUM(units_sold) AS total_units_sold
+FROM 
+    SALES_DATA
+GROUP BY 
+    product_id,
+    year(transaction_date),
+    month(transaction_date)
+HAVING 
+    SUM(units_sold) > 10
+ORDER BY 
+    total_units_sold DESC;
+    
+--GROUP BY: Groups data by product_id, year, and month to calculate total units sold per product per month.
+--HAVING: Filters products with sales greater than 1,000 units in any month.
+--ORDER BY: Sorts products by sales volume, starting with the highest-selling products.
+
+/*
+The NVL function in SQL is used to replace NULL values with a specified value. 
+In the context of the sales dataset you provided, the NVL function can be useful in scenarios where certain fields might have missing or NULL values. Here are several business use cases where the NVL function can be applied:
+
+In SQL, NVL() converts a null value to an actual value.
+   Data types that can be used are date, character and number.
+   The data type must match with each other i.e. expr1 and expr2 must be the same data type.
+Syntax – NVL (expr1, expr2)
+*/
+
+--Use Case 1: Substitute Missing Sales Amounts
+--In some cases, sales transactions might be missing a sales_amount due to data entry errors or incomplete records. 
+--You can use the NVL function to replace these NULL values with a default value, such as 0.
+
+SELECT 
+    transaction_id, 
+    sales_amount,
+    NVL(sales_amount, 0) AS sales_amount_corrected,
+    product_category, 
+    customer_id, 
+    region
+FROM 
+    sales_data
+WHERE sales_amount IS NULL;
+    
+--Explanation: If sales_amount is NULL, the query will substitute it with 0, ensuring that you do not encounter issues when calculating total sales.
+
+--CURRENT_DATEUse Case 2: Calculate Average Sales per Customer with Default Values
+-- Scenario: If a customer’s transaction record has NULL values for sales_amount, you might want to treat those missing values as zero to avoid skewing the average.
+
+SELECT 
+    customer_id, 
+    ROUND(AVG(NVL(sales_amount, 0)),2) AS avg_sales
+FROM 
+    sales_data
+GROUP BY 
+    customer_id
+ORDER BY
+    avg_sales DESC;
+    
+--Explanation: This query calculates the average sales per customer, treating NULL sales amounts as 0. 
+--This can give a more accurate view of customer activity when data is incomplete.
+
+--Use Case 3: Handle Missing Product Categories
+--Scenario: Sometimes a product category might be missing from the dataset. You can use NVL to replace missing product categories with a placeholder such as 'Unknown'.
+
+SELECT 
+    transaction_id, product_category,
+    NVL(product_category, 'Unknown') AS product_category,
+    sales_amount, 
+    region
+FROM 
+    sales_data
+WHERE 
+    product_category IS NULL ;
+    
+--Explanation: Any transactions missing a product_category will be labeled as 'Unknown'.
+--This ensures cleaner and more consistent reporting when analyzing product sales.
+
+--Use Case 4: Region-Specific Analysis with Default Region
+--Scenario: In some cases, the region field may be NULL due to incomplete data entry. 
+--You can substitute NULL regions with a default, like 'Unspecified', to ensure all transactions are categorized.
+
+SELECT
+    region,
+    NVL(region, 'Unspecified') AS region, 
+    COUNT(transaction_id) AS total_transactions
+FROM 
+    sales_data
+WHERE 
+    region IS NULL    
+GROUP BY 
+    region,NVL(region, 'Unspecified');
+
+--Explanation: This query replaces NULL values in the region column with 'Unspecified', allowing you to track transactions from unspecified regions.
+
+--Use Case 5: Revenue Analysis with Default Units Sold
+--Scenario: In some transactions, the units_sold field may be missing or NULL. You can treat missing values as 1 to ensure calculations for total revenue are accurate.
+
+SELECT 
+    transaction_id, 
+    sales_amount, 
+    NVL(sales_amount, 0) AS sales_amount_corrected,
+    units_sold,
+    NVL(units_sold, 0) AS corrected_units_sold,
+    sales_amount * units_sold as tot_rev_uncorrected,
+    (sales_amount_corrected * corrected_units_sold) AS total_rev_corrected
+FROM 
+    sales_data;
+--Explanation: This query treats NULL values in units_sold as 1, ensuring that revenue calculations do not fail due to missing data.
+
+--Use Case 6: Customer Segmentation with Default Customer ID
+--Scenario: If some transactions are missing customer_id values, you can assign a default customer ID like 9999 to represent unidentified customers.
+
+SELECT 
+    NVL(customer_id, 9999) AS customer_id, 
+    SUM(sales_amount) AS total_sales
+FROM 
+    sales_data
+GROUP BY 
+    NVL(customer_id, 9999)
+ORDER BY NVL(customer_id, 9999);
+
+--Explanation: This query replaces NULL values in customer_id with 9999, allowing you to analyze sales associated with unidentified customers.

@@ -1,0 +1,28 @@
+CREATE OR REPLACE TABLE online_orders (
+    customer_id INT,
+    customer_name VARCHAR(255),
+    order_date DATE,
+    amount DECIMAL(10, 2)
+);
+
+CREATE OR REPLACE TABLE instore_orders (
+    customer_id INT,
+    customer_name VARCHAR(255),
+    order_date DATE,
+    amount DECIMAL(10, 2)
+);
+
+SELECT customer_id, customer_name
+FROM online_orders
+UNION
+SELECT customer_id, customer_name
+FROM instore_orders
+ORDER BY customer_id;
+
+SELECT customer_id, customer_name, order_date, amount
+FROM online_orders
+UNION ALL
+SELECT customer_id, customer_name, order_date, amount
+FROM instore_orders
+order by customer_id;
+

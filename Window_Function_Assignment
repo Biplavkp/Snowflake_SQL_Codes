@@ -1,0 +1,140 @@
+--1. Customer and Sales Performance Analysis
+--•	Business Scenario: You are a business analyst for a retail company. You have multiple datasets: one for customer details, one for product ---sales, and one for customer transactions. You need to analyze customer behavior and sales performance over time.
+--•	Window Functions: ROW_NUMBER(), RANK(), DENSE_RANK(), LAG(), LEAD()
+--Assignment Problem:
+
+--•	customers (Customer Information)
+--•	sales (Product Sales Information)
+--•	transactions (Customer Transactions Data)
+
+
+-- Customers Table
+CREATE OR REPLACE TABLE customers (
+    customer_id INT PRIMARY KEY,
+    customer_name VARCHAR(255),
+    region VARCHAR(50),
+    join_date DATE
+);
+
+-- Sales Table
+CREATE OR REPLACE TABLE sales (
+    sale_id INT PRIMARY KEY,
+    product_id VARCHAR(50),
+    sale_amount DECIMAL(10, 2),
+    sale_date DATE,
+    customer_id INT REFERENCES customers(customer_id)
+);
+
+-- Transactions Table
+CREATE OR REPLACE TABLE transactions (
+    transaction_id INT PRIMARY KEY,
+    customer_id INT REFERENCES customers(customer_id),
+    transaction_date DATE,
+    transaction_amount DECIMAL(10, 2)
+);
+
+CREATE OR REPLACE STORAGE INTEGRATION SALES_INT
+TYPE = EXTERNAL_STAGE
+STORAGE_PROVIDER = S3
+ENABLED = TRUE
+STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::061051246251:role/sales_performance_role'
+STORAGE_ALLOWED_LOCATIONS = ('s3://salesperformancebucket/');
+
+DESC INTEGRATION S3_INT;
+
+CREATE OR REPLACE STAGE SALES_STAGE
+URL = 's3://salesperformancebucket'
+file_format = DEMODATABASE.DEMO_SCHEMA.MY_CSV_FORMAT
+STORAGE_INTEGRATION = SALES_INT;
+
+LIST @SALES_STAGE;
+
+SHOW STAGES;
+
+CREATE OR REPLACE PIPE CUSTOMER_PIPE AUTO_INGEST= TRUE AS
+COPY INTO customers
+FROM '@SALES_STAGE/Customer/'
+FILE_FORMAT = MY_CSV_FORMAT;
+
+CREATE OR REPLACE PIPE SALES_PIPE AUTO_INGEST= TRUE AS
+COPY INTO sales
+FROM '@SALES_STAGE/Sales/'
+FILE_FORMAT = MY_CSV_FORMAT;
+
+CREATE OR REPLACE PIPE TRANSACTION_PIPE AUTO_INGEST= TRUE AS
+COPY INTO transactions
+FROM '@SALES_STAGE/Transaction/'
+FILE_FORMAT = MY_CSV_FORMAT;
+
+
+ALTER PIPE CUSTOMER_PIPE refresh;
+ALTER PIPE SALES_PIPE refresh;
+ALTER PIPE TRANSACTION_PIPE refresh;
+
+SELECT COUNT(*) FROM customers;
+SELECT COUNT(*) FROM sales;
+SELECT COUNT(*) FROM transactions;
+
+--•	Task 1: Rank customers based on their total purchase amount per year. Identify the top 5 customers each year and track their ranking over -------time. (Use RANK())
+--•	Task 2: For each customer, get their previous transaction amount and compare it with their current one. (Use LAG())
+--•	Task 3: Calculate the running total of sales for each customer in the last 3 years. (Use SUM() OVER)
+--•	Task 4: Divide customers into quartiles based on their total sales per year and analyze their spending patterns. (Use NTILE())
+--Tables:
+
+SELECT
+     customer_id,
+     RANK() OVER(PARTITION BY transaction_date ORDER BY transaction_amount DESC) AS TOT_PUR
+FROM transactions;     
+     
+------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- Employees Table
+CREATE OR REPLACE TABLE employees_win (
+    employee_id INT PRIMARY KEY,
+    employee_name VARCHAR(255),
+    hire_date DATE,
+    current_department VARCHAR(100)
+);
+
+-- Evaluations Table
+CREATE OR REPLACE TABLE evaluations (
+    evaluation_id INT PRIMARY KEY,
+    employee_id INT REFERENCES employees_win(employee_id),
+    evaluation_month DATE,
+    evaluation_score DECIMAL(5, 2)
+);
+
+-- Departments Table
+CREATE OR REPLACE TABLE departments (
+    department_id INT PRIMARY KEY,
+    department_name VARCHAR(100),
+    employee_id INT REFERENCES employees_win(employee_id),
+    transfer_date DATE
+);
+
+CREATE OR REPLACE STORAGE INTEGRATION EMPLOYEE_INT
+TYPE = EXTERNAL_STAGE
+STORAGE_PROVIDER = S3
+ENABLED = TRUE
+STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::061051246251:role/employee_win_role'
+STORAGE_ALLOWED_LOCATIONS = ('s3://employeesdatabucketfolder/');
+
+DESC INTEGRATION EMPLOYEE_INT;
+
+CREATE OR REPLACE STAGE EMPLOYEE_STAGE
+URL = 's3://employeesdatabucketfolder'
+file_format = DEMODATABASE.DEMO_SCHEMA.MY_CSV_FORMAT
+STORAGE_INTEGRATION = EMPLOYEE_INT;
+
+LIST @SALES_STAGE;
+
+SHOW STAGES;
+
+CREATE OR REPLACE PIPE EMPLOYEE_PIPE AUTO_INGEST= TRUE AS
+COPY INTO employees_win
+FROM '@EMPLOYEE_STAGE/Employees/'
+FILE_FORMAT = MY_CSV_FORMAT;
+
+ALTER PIPE EMPLOYEE_PIPE REFRESH;
+
+SELECT COUNT(*) FROM employees_win;
